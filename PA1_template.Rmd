@@ -1,25 +1,170 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research Project 1"
+author: "Daniel Ludewig"
+date: "13 May 2017"
+output: md_document
 ---
 
-
-## Loading and preprocessing the data
-
-
-
-## What is mean total number of steps taken per day?
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 
+## Part 1: Loading and processing data
 
-## What is the average daily activity pattern?
+The activity data was read into R and saved to the variable *activity* using the following code: 
+
+```{r echo=TRUE}
+activity <- read.csv("activity.csv")
+```
+
+## Part 2: What is mean total number of steps taken per day?
+
+1. The total number of steps taken per day was calculated using the following code:
+
+``` {r echo=TRUE}
+daily.sum <- tapply(activity$steps,activity$date, FUN = sum )
+```
+
+2.
+```{r echo = TRUE}
+library(ggplot2)
+qplot(daily.sum, xlab = "Total Steps taken per day", 
+      main = "Steps per day histogram")
+```
+
+3. 
+```{r echo = TRUE}
+mean <- mean(daily.sum, na.rm = TRUE)
+median <- median(daily.sum, na.rm = TRUE)
+```
+
+The mean number of steps per day is `r mean` and the median is `r median`. 
+
+## Part 3: What is the average daily activity pattern?
+
+1. A time plot can be constructed with the following code: 
+
+```{r echo = TRUE}
+# The new data frame Time.data is created by taking the mean of the steps taken for each time interval, using tapply. 
+Time.data <- as.data.frame(as.numeric(
+      tapply(activity$steps,activity$interval, FUN = mean, na.rm= TRUE)))
+
+# Rename the column
+colnames(Time.data)<- "Mean.Steps"
+
+# Add a new column which is the corresponding time interval. 
+Time.data$Time <- levels(as.factor(activity$interval))
+
+# Use the base plotting system to create a time series. 
+with(Time.data, plot(Time, Mean.Steps, type = "l", xlab = "Time Interval", 
+                     ylab = "Average Steps", 
+                     main = "Time Series of Average Steps"))
+```
+
+2. 
+```{r echo = TRUE}
+Max.In<- Time.data[which(Time.data$Mean.Steps == max(Time.data$Mean.Steps)), ]
+```
+
+The 5 minute interval with the highest average across all days is `r Max.In$Time`. 
+
+## Part 4: Imputing missing values. 
+
+1. 
+```{r echo = TRUE}
+NA.Values <- as.list(table(is.na(activity$steps)))
+```
+
+The total number of missing values in the data set is `r NA.Values[[2]]`. 
+
+2. The strategy used to impute the missing values was to take the average value for that time interval. The following code descibes the process:
+```{r echo = TRUE}
+# The interval averages need to be calculated. 
+interval.averages <- rep(sapply(split(activity$steps, activity$interval), 
+                            mean, na.rm = TRUE), 
+                         length(activity$steps)/
+                               length(levels(as.factor(activity$interval))))
+
+# Find where the missing values are. 
+NA.positions <-  which(is.na(activity$steps))
+
+# Create new variable containing the steps.
+steps <- activity$steps
+
+# Use a for loop to replace all the NA values with the average value for that 
+# interval. 
+for(i in NA.positions){steps[i] <- interval.averages[i]}
+```
+
+3. A new data set called *new_activity* can be created using the following code:
+```{r echo = TRUE}
+#  Create a new data frame. 
+date <- activity$date
+
+interval <- activity$interval
+
+new_activity <- as.data.frame(cbind(steps, date, interval))
+```
+
+4. The following code is used to compare the new data set to the old data set:
+
+```{r echo = TRUE}
+# Create a variable containing the total number of steps each day.
+new.daily.sum <- tapply(new_activity$steps,new_activity$date, FUN = sum )
+
+# Call qplot on the on the new variable. 
+library(ggplot2)
+qplot(new.daily.sum, xlab = "Total Steps taken per day", 
+      main = "Steps per day histogram")
+
+# Calculate new mean and median. 
+new.mean <- mean(new.daily.sum, na.rm = TRUE)
+new.median <- median(new.daily.sum, na.rm = TRUE)
+```
+
+The new mean number of steps per day is `r new.mean` and the new median is `r new.median`. Because of the method used to impute the missing values, the mean has not changed, and the median is now equal to the mean. 
+
+The total amount of steps taken per day count has increased in the second histogram, particularly in the middle of the graph. This is due to using the average amount of steps per day to impute the missing values, which is `r mean`. 
+
+## Part 5: Are there differences in activity patterns between weekdays and weekends?
+
+1. A new factor variable dictating whether it is a weekday or a weekend can be created with the following code:
+
+```{r echo = TRUE}
+# Create new factor variable indentifying the day of the week. 
+new_activity$date <- as.POSIXlt(activity$date)
+new_activity$day <- as.factor(weekdays(new_activity$date))
+
+# Create a list of all weekdays.
+weekdays <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")
+
+# Use sapply to create another new factor variable indicating whether it is a weekday or weekend. 
+new_activity$wd_we <- sapply(new_activity$day, FUN = function(x){
+      if(x %in% weekdays){"Weekday"}else{"Weekend"}
+      })
+```
+
+2. A plot to compare the time series between the weekdays and weekends can be constructed with the following code;
+
+```{r echo = TRUE, fig.height=8}
+# The new data frame Time.data2 is created by taking the mean of the steps taken for each time interval, using tapply. 
+Time.data2 <-  as.data.frame(
+      with(new_activity, tapply(steps, list(interval, wd_we),
+             FUN = mean, na.rm= TRUE)))
+
+# Add a new column which is the corresponding time interval. 
+Time.data2$Time <- levels(as.factor(new_activity$interval))
+
+# Change the parameters to included two rows of plots.
+par(mfrow=c(2,1))
+
+# Use the base plotting system to create two time series. 
+with(Time.data2, plot(Time, Weekday, type = "l", xlab = "Time Interval", 
+                     ylab = "Average Steps", 
+                     main = "Time Series of Average Steps on Weekdays"))
 
 
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+with(Time.data2, plot(Time, Weekend, type = "l", xlab = "Time Interval", 
+                      ylab = "Average Steps", 
+                      main = "Time Series of Average Steps on Weekends"))
